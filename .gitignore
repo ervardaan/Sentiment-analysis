@@ -1,0 +1,36 @@
+.venv/
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+.build/
+develop-eggs/
+dist/
+build/
+.eggs/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Editors
+.vscode/
+.idea/
+*.swp
+
+# macOS
+.DS_Store
+
+# Python
+*.log
+
+# Data
+preprocessed_data/
+
+# Secrets
+.env
+
+# Jupyter
+.ipynb_checkpoints/

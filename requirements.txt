@@ -1,0 +1,5 @@
+nltk
+matplotlib
+scikit-learn
+scipy
+tqdm
