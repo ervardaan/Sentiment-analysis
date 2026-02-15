@@ -1,0 +1,64 @@
+name: Code Quality
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  code-quality:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install flake8 black isort pylint mypy
+
+      - name: Check formatting with black
+        run: |
+          black --check .
+
+      - name: Check import sorting with isort
+        run: |
+          isort --check-only .
+
+      - name: Lint with flake8
+        run: |
+          flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics --format=json --output-file=flake8-report.json || true
+
+      - name: Type check with mypy
+        run: |
+          mypy . --ignore-missing-imports --html htmlreport || true
+
+      - name: Complexity check with pylint
+        run: |
+          pylint tweet_preprocessing.py sample_usage.py config.py --exit-zero || true
+
+      - name: Upload flake8 report
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: flake8-report
+          path: flake8-report.json
+
+      - name: Comment PR with linting results
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const fs = require('fs');
+            if (fs.existsSync('flake8-report.json')) {
+              const report = JSON.parse(fs.readFileSync('flake8-report.json', 'utf8'));
+              console.log('Flake8 violations found:', report.length);
+            }

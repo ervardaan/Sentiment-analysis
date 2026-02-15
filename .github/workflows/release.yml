@@ -1,0 +1,99 @@
+name: Build & Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+          cache: 'pip'
+
+      - name: Install build dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install build wheel twine
+          pip install -r requirements.txt
+
+      - name: Get version from tag
+        id: tag
+        run: echo "version=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+
+      - name: Build distribution packages
+        run: |
+          python -m build
+
+      - name: Create release artifacts
+        run: |
+          mkdir -p release-artifacts
+          cp dist/* release-artifacts/
+          cp README.md release-artifacts/
+          cp requirements.txt release-artifacts/
+          tar -czf release-artifacts/sentiment-analysis-${{ steps.tag.outputs.version }}.tar.gz release-artifacts/
+
+      - name: Create GitHub Release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: Release ${{ steps.tag.outputs.version }}
+          body: |
+            ## Release ${{ steps.tag.outputs.version }}
+            
+            ### Files Included
+            - Python wheel distribution
+            - Source distribution
+            - README.md
+            - requirements.txt
+            
+            ### Installation
+            ```bash
+            pip install sentiment-analysis-${{ steps.tag.outputs.version }}-py3-none-any.whl
+            ```
+            
+            ### Usage
+            See README.md for detailed documentation.
+          draft: false
+          prerelease: false
+
+      - name: Upload release artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: release-packages
+          path: release-artifacts/
+
+  test-release:
+    needs: release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v3
+        with:
+          name: release-packages
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+
+      - name: Verify packages
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+          for wheel in *.whl; do
+            echo "Testing wheel: $wheel"
+            pip install "$wheel" || exit 1
+          done

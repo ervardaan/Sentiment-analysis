@@ -1,0 +1,9 @@
+[bandit]
+# Exclude test files and __pycache__
+exclude_dirs = ['tests', '__pycache__', '.venv', 'venv']
+
+# Skips
+skips = ['B101']  # Use of assert_true/false - mute since we use pytest
+
+[bandit:assert_used]
+skips = ['tests/*']

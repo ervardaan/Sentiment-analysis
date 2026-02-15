@@ -1,0 +1,88 @@
+name: Performance Benchmarks
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+  schedule:
+    - cron: '0 2 * * 0'  # Weekly benchmark on Sunday
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest-benchmark memory-profiler
+
+      - name: Run preprocessing benchmarks
+        run: |
+          python -c "
+          import time
+          from tweet_preprocessing import TweetPreprocessor
+          
+          preprocessor = TweetPreprocessor()
+          
+          # Benchmark single tweet
+          test_tweet = '@user This is a test tweet with URL https://example.com and #hashtag :) RT something'
+          
+          start = time.time()
+          for _ in range(10000):
+              preprocessor.process(test_tweet)
+          elapsed = time.time() - start
+          
+          print(f'10,000 tweet preprocessing: {elapsed:.2f}s')
+          print(f'Per tweet: {elapsed*1000/10000:.4f}ms')
+          print(f'Throughput: {10000/elapsed:.0f} tweets/sec')
+          " > benchmark-results.txt
+
+      - name: Run vectorization benchmarks
+        run: |
+          python -c "
+          import time
+          import json
+          from tweet_preprocessing import TweetVectorizer
+          
+          # Create sample documents
+          sample_docs = [' '.join(['word'] * 10) for _ in range(100)]
+          
+          vec = TweetVectorizer()
+          
+          start = time.time()
+          vectors, meta = vec.fit_transform(sample_docs)
+          elapsed = time.time() - start
+          
+          print(f'Vectorizing 100 docs: {elapsed:.4f}s')
+          print(f'Vector shape: {meta[\"vector_shape\"]}')
+          print(f'Vocabulary size: {meta[\"vocab_size\"]}')
+          " >> benchmark-results.txt
+
+      - name: Display benchmark results
+        run: cat benchmark-results.txt
+
+      - name: Upload benchmark results
+        uses: actions/upload-artifact@v3
+        with:
+          name: benchmark-results
+          path: benchmark-results.txt
+
+      - name: Store benchmark on GitHub Pages
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: benchmark-action/github-action-benchmark@v1
+        with:
+          tool: 'customBiggerIsBetter'
+          output-file-path: benchmark-results.txt
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          auto-push: true
