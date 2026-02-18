@@ -8,6 +8,13 @@ on:
   schedule:
     - cron: '0 0 * * 0'  # Weekly on Sunday
 
+# Grant the minimal permissions required for CodeQL to upload results.
+# Note: workflows triggered by pull requests from forks will still be
+# restricted by GitHub and may not have permission to upload results.
+permissions:
+  contents: read
+  security-events: write
+
 jobs:
   security:
     runs-on: ubuntu-latest
@@ -40,13 +47,13 @@ jobs:
           pip-audit --desc || true
 
       - name: Upload Bandit report
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: bandit-report
           path: bandit-report.json
 
       - name: Upload safety report
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: safety-report
           path: safety-report.json
