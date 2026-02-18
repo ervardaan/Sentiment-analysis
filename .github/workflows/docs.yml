@@ -30,7 +30,19 @@ jobs:
           mkdir -p docs/_build
           if [ ! -f docs/conf.py ]; then
             mkdir -p docs
-            echo "Documentation configuration auto-generated" > docs/conf.py
+            cat > docs/conf.py << 'EOF'
+          project = 'Sentiment Analysis'
+          author = 'NLP Team'
+          extensions = ['sphinx.ext.autodoc', 'sphinx.ext.napoleon']
+          html_theme = 'sphinx_rtd_theme'
+          EOF
+            cat > docs/index.rst << 'EOF'
+          Welcome to Sentiment Analysis
+          ==============================
+
+          .. toctree::
+             :maxdepth: 2
+          EOF
           fi
 
       - name: Build documentation
@@ -40,7 +52,7 @@ jobs:
           cd ..
 
       - name: Upload documentation artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: documentation
           path: docs/_build/html/
@@ -51,4 +63,3 @@ jobs:
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./docs/_build/html
-          cname: sentiment-analysis-docs.example.com

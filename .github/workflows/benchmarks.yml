@@ -52,37 +52,35 @@ jobs:
         run: |
           python -c "
           import time
-          import json
           from tweet_preprocessing import TweetVectorizer
-          
+
           # Create sample documents
           sample_docs = [' '.join(['word'] * 10) for _ in range(100)]
-          
+
           vec = TweetVectorizer()
-          
+
           start = time.time()
           vectors, meta = vec.fit_transform(sample_docs)
           elapsed = time.time() - start
-          
+
           print(f'Vectorizing 100 docs: {elapsed:.4f}s')
-          print(f'Vector shape: {meta[\"vector_shape\"]}')
-          print(f'Vocabulary size: {meta[\"vocab_size\"]}')
+          shape = vectors.shape if hasattr(vectors, 'shape') else 'N/A'
+          print(f'Vector shape: {shape}')
+          vocab = meta.get('vocab_size') or meta.get('n_features') or getattr(vec, 'vocab_size', 'N/A')
+          print(f'Vocabulary size: {vocab}')
           " >> benchmark-results.txt
 
       - name: Display benchmark results
         run: cat benchmark-results.txt
 
       - name: Upload benchmark results
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: benchmark-results
           path: benchmark-results.txt
 
-      - name: Store benchmark on GitHub Pages
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        uses: benchmark-action/github-action-benchmark@v1
-        with:
-          tool: 'customBiggerIsBetter'
-          output-file-path: benchmark-results.txt
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          auto-push: true
+      # NOTE: benchmark-action/github-action-benchmark requires a specific JSON format.
+      # Skipped here to avoid hard failures; re-enable with a proper JSON exporter.
+      # - name: Store benchmark on GitHub Pages
+      #   if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+      #   uses: benchmark-action/github-action-benchmark@v1
