@@ -29,6 +29,8 @@ from nltk.tokenize import TweetTokenizer
 from sklearn.feature_extraction.text import TfidfVectorizer
 from scipy.sparse import csr_matrix
 from tqdm import tqdm
+import numpy as np
+import matplotlib.pyplot as plt
 
 
 # Configuration (kept local for single-file simplicity)
@@ -120,6 +122,68 @@ class TweetVectorizer:
         return self.vectorizer.transform(documents)
 
 
+def process_tweet(tweet: str, preprocessor: TweetPreprocessor | None = None) -> List[str]:
+    """Compatibility wrapper matching the lab API.
+
+    Cleans and tokenizes a single tweet, removes stopwords/punctuation, and stems tokens.
+    If a `preprocessor` is provided it will be used, otherwise a default one is created.
+    """
+    if preprocessor is None:
+        preprocessor = TweetPreprocessor()
+    return preprocessor.process(tweet)
+
+
+def build_freqs(tweets: List[str], ys) -> Dict[Tuple[str, int], int]:
+    """Build frequencies mapping (word, label) -> count.
+
+    Args:
+        tweets: list of raw tweet strings
+        ys: iterable of labels (0/1) or numpy array of shape (m,) or (m,1)
+
+    Returns:
+        freqs: dictionary where keys are (word, label) and values are integer counts
+    """
+    yslist = np.squeeze(np.asarray(ys)).tolist()
+    freqs: Dict[Tuple[str, int], int] = {}
+    pre = TweetPreprocessor()
+    for y, tweet in zip(yslist, tweets):
+        for word in process_tweet(tweet, pre):
+            pair = (word, int(y))
+            freqs[pair] = freqs.get(pair, 0) + 1
+    return freqs
+
+
+def build_freq_table_and_plot(freqs: Dict[Tuple[str, int], int], keys: List[str],
+                              figsize=(8, 8), savepath: str | None = None, show: bool = True):
+    """Create a table of positive/negative counts for `keys` and plot log-scaled scatter.
+
+    Returns the data list in the same format used in the lab: [[word, pos, neg], ...]
+    """
+    data = []
+    for word in keys:
+        pos = freqs.get((word, 1), 0)
+        neg = freqs.get((word, 0), 0)
+        data.append([word, pos, neg])
+
+    # Plot
+    fig, ax = plt.subplots(figsize=figsize)
+    x = np.log([r[1] + 1 for r in data])
+    y = np.log([r[2] + 1 for r in data])
+    ax.scatter(x, y)
+    plt.xlabel("Log Positive count")
+    plt.ylabel("Log Negative count")
+    for i, row in enumerate(data):
+        ax.annotate(row[0], (x[i], y[i]), fontsize=12)
+    ax.plot([0, max(x) if len(x) else 1], [0, max(x) if len(x) else 1], color='red')
+    plt.tight_layout()
+    if savepath:
+        fig.savefig(savepath)
+    if show:
+        plt.show()
+    plt.close(fig)
+    return data
+
+
 def ensure_nltk_data():
     for pkg in ("twitter_samples", "stopwords"):
         try:
@@ -177,6 +241,19 @@ def run_pipeline():
 
     # Vectorize
     docs = [" ".join(toks) for toks in processed]
+    # Build frequency dictionary (numeric labels: 1 -> positive, 0 -> negative)
+    y_numeric = np.append(np.ones((len(pos),)), np.zeros((len(neg),)))
+    freqs = build_freqs(all_tweets, y_numeric)
+
+    # Prepare a set of keys to inspect (kept from lab example)
+    keys = ['happi', 'merri', 'nice', 'good', 'bad', 'sad', 'mad', 'best', 'pretti',
+            '❤', ':)', ':(', '😒', '😬', '😄', '😍', '♛',
+            'song', 'idea', 'power', 'play', 'magnific']
+    freq_plot_path = os.path.join(OUTPUT_DIR, 'freq_plot.png')
+    freq_table = build_freq_table_and_plot(freqs, keys, savepath=freq_plot_path, show=False)
+    # save the table
+    with open(os.path.join(OUTPUT_DIR, 'freq_table.json'), 'w') as f:
+        json.dump(freq_table, f, ensure_ascii=False, indent=2)
     vec = TweetVectorizer()
     vectors, vec_meta = vec.fit_transform(docs)
     logger.info(f"Vector shape: {vec_meta['vector_shape']}, vocab_size: {vec_meta['vocab_size']}")
